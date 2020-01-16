@@ -1,0 +1,9 @@
+Package: com.haotestlabs.nfcbackgroundenabler
+Name: NFCBackgroundEnabler
+Depends: mobilesubstrate
+Version: 0.0.1
+Architecture: iphoneos-arm
+Description: An awesome MobileSubstrate tweak!
+Maintainer: ArandomDev <Haow6449@gmail.com>
+Author: ArandomDev <Haow6449@gmail.com>
+Section: Tweaks
