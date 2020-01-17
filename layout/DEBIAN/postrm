@@ -1,0 +1,6 @@
+#!/bin/bash
+
+echo "Reloading NFC daemon"
+killall -9 nfcd || true
+
+exit 0
