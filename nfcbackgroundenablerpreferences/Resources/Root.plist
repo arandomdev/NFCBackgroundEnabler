@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>items</key>
+	<array>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>Session Time</string>
+			<key>footerText</key>
+			<string>How long each session lasts for. The default is 2 seconds.</string>
+			<key>isStaticText</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>min</key>
+			<integer>0</integer>
+			<key>max</key>
+			<integer>30</integer>
+			<key>default</key>
+			<integer>2</integer>
+			<key>showValue</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.haotestlabs.nfcbackgroundenablerpreferences</string>
+			<key>PostNotification</key>
+			<string>com.haotestlabs.nfcbackgroundenablerpreferences.reload</string>
+			<key>key</key>
+			<string>ProtectionTime</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSGroupCell</string>
+			<key>label</key>
+			<string>Cooldown Time</string>
+			<key>footerText</key>
+			<string>How long to wait between each session. The default is 1 second. Typically it will wait for the Session Time and then the Cooldown Time before looking for new tags.</string>
+			<key>isStaticText</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSliderCell</string>
+			<key>min</key>
+			<integer>0</integer>
+			<key>max</key>
+			<integer>30</integer>
+			<key>default</key>
+			<integer>1</integer>
+			<key>showValue</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.haotestlabs.nfcbackgroundenablerpreferences</string>
+			<key>PostNotification</key>
+			<string>com.haotestlabs.nfcbackgroundenablerpreferences.reload</string>
+			<key>key</key>
+			<string>DebounceTime</string>
+		</dict>
+	</array>
+	<key>title</key>
+	<string>NFCBackgroundEnabler</string>
+</dict>
+</plist>

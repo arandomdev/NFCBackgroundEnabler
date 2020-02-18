@@ -3,4 +3,7 @@
 echo "Reloading NFC daemon"
 killall -9 nfcd || true
 
+echo "Reloading Preferences"
+killall -9 Preferences || true
+
 exit 0

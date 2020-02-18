@@ -1,4 +1,4 @@
-FINALPACKAGE = 1
+# FINALPACKAGE = 1
 
 ARCHS = arm64
 
@@ -12,3 +12,5 @@ NFCBackgroundEnabler_FILES = Tweak.xm
 NFCBackgroundEnabler_CFLAGS = -fobjc-arc
 
 include $(THEOS_MAKE_PATH)/tweak.mk
+SUBPROJECTS += nfcbackgroundenablerpreferences
+include $(THEOS_MAKE_PATH)/aggregate.mk
