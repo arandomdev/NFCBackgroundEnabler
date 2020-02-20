@@ -1,15 +1,23 @@
 float protectionTime = 2;
 float debounceTime = 1;
+bool tagLockEnable = YES;
 
 @interface NFDriverWrapper
 - (_Bool)resumeDiscovery;
 - (_Bool)checkTagPresence:(id)arg1;
+- (_Bool)disconnectTag:(id)arg1 tagRemovalDetect:(_Bool)arg2;
+- (_Bool)connectTag:(id)arg1;
 @end
 
 @interface NFTimer
 - (void)stopTimer;
 - (void)startTimer:(double)arg1 leeway:(double)arg2;
 - (id)initWithCallback:(id)arg1 queue:(id)arg2;
+@end
+
+@interface NFBackgroundTagReadingManager
+@property(nonatomic, retain) NSDate *dateOfLastScan;
+@property(nonatomic, assign) bool shouldUpdateOnWake;
 @end
 
 %hook NFHardwareControllerInfo
@@ -39,9 +47,13 @@ float debounceTime = 1;
 %end
 
 %hook NFBackgroundTagReadingManager
-- (void)handleDetectedTags:(id)tags {
-	HBLogInfo(@"Detected tags");
+%property(nonatomic, retain) NSDate *dateOfLastScan;
+- (void)didScreenStateChange:(_Bool)state {
 	%orig;
+}
+
+- (void)handleDetectedTags:(id)tags {
+	HBLogInfo(@"Detected tags, count: %lu", [tags count]);
 
 	/**
 	*	_readermodeBurnoutProtectionTimer
@@ -49,16 +61,40 @@ float debounceTime = 1;
 	*	Modified here because it also affects app sessions.
 	*/
 	NFDriverWrapper *driverWrapper = MSHookIvar<NFDriverWrapper *>(self, "_driverWrapper");
+
+	// start test
+	// dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+		if ([driverWrapper connectTag:tags[0]]) {
+			HBLogDebug(@"Tag %@", [driverWrapper checkTagPresence:tags[0]] ? @"present" : @"not Present");
+			HBLogDebug(@"tag removal: %d", [driverWrapper disconnectTag:tags[0] tagRemovalDetect:YES]);
+			HBLogDebug(@"Tag %@", [driverWrapper checkTagPresence:tags[0]] ? @"present" : @"not Present");
+		}
+	// });
+	// end test
+
 	NFTimer *protectionTimer = MSHookIvar<NFTimer *>(driverWrapper, "_readermodeBurnoutProtectionTimer");
 	[protectionTimer stopTimer];
 
-	HBLogInfo(@"Restarting Timer to: %f: ", protectionTime);
+	HBLogInfo(@"Restarting Timer to: %f", protectionTime);
 	[protectionTimer startTimer:protectionTime leeway:0.1];
+
+	// if (self.dateOfLastScan) {
+	// 	double timeSinceLastScan = [self.dateOfLastScan timeIntervalSinceNow] * -1;
+	// 	float threshold = protectionTime + debounceTime + 1;
+	// 	if (timeSinceLastScan < threshold) {
+	// 		HBLogDebug(@"Skipping scan");
+	// 		self.dateOfLastScan = [NSDate date];
+	// 		return;
+	// 	}
+	// 	// HBLogDebug(@"timeSinceLastScan: %f", timeSinceLastScan);
+	// }
+	// self.dateOfLastScan = [NSDate date];
+
+	%orig;
 }
 %end
 
 static void reloadPreferences() {
-	HBLogInfo(@"Reload preferences");
 	NSString *preferencesFilePath = [NSString stringWithFormat:@"/User/Library/Preferences/com.haotestlabs.nfcbackgroundenablerpreferences.plist"];
 	
 	NSData *fileData = [NSData dataWithContentsOfFile:preferencesFilePath];
@@ -81,8 +117,6 @@ static void reloadPreferences() {
 }
 
 %ctor {
-	HBLogInfo(@"Hooked");
-
 	reloadPreferences();
 	CFNotificationCenterAddObserver(
 		CFNotificationCenterGetDarwinNotifyCenter(),
