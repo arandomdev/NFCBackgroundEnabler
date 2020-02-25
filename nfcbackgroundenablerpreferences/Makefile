@@ -1,5 +1,3 @@
-ARCHS = arm64
-
 include $(THEOS)/makefiles/common.mk
 
 BUNDLE_NAME = NFCBackgroundEnablerPreferences

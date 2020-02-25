@@ -1,19 +1,16 @@
+#import "Headers/NFBackgroundTagReadingManager.h"
+#import "Headers/NFDriverWrapper.h"
+#import "Headers/NFTimer.h"
+#import "Headers/NFTag.h"
+#import "NBETagLockProvider/NBETagLockProvider.h"
+
 float protectionTime = 2;
 float debounceTime = 1;
-
-@interface NFDriverWrapper
-- (_Bool)resumeDiscovery;
-- (_Bool)checkTagPresence:(id)arg1;
-@end
-
-@interface NFTimer
-- (void)stopTimer;
-- (void)startTimer:(double)arg1 leeway:(double)arg2;
-- (id)initWithCallback:(id)arg1 queue:(id)arg2;
-@end
+bool airplaneOverride = false;
+bool tagLockEnable = YES;
 
 %hook NFHardwareControllerInfo
-- (_Bool)hasLPCDSupport {
+- (bool)hasLPCDSupport {
 	// Enables background tag detection.
 	return YES;
 }
@@ -26,9 +23,9 @@ float debounceTime = 1;
 	*	The timer that dictates how long to wait before a new session can start.
 	*	Originally set for 5 seconds.
 	*/
-	const double debounceTimerTime = 5;
+	const double originalDebounceTimerTime = 5;
 
-	if (time == debounceTimerTime) {
+	if (time == originalDebounceTimerTime) {
 		%orig(debounceTime, leeway);
 		HBLogInfo(@"DebounceTimer fired with: %f and: %f", debounceTime, leeway);
 	}
@@ -39,9 +36,23 @@ float debounceTime = 1;
 %end
 
 %hook NFBackgroundTagReadingManager
-- (void)handleDetectedTags:(id)tags {
-	HBLogInfo(@"Detected tags");
+%property(nonatomic, retain) NBETagLockProvider *tagLockProvider;
+
+- (id)initWithQueue:(id)queue driverWrapper:(NFDriverWrapper *)driverWrapper lpcdHWSupport:(bool)arg3 {
+	id orig = %orig;
+	if (orig) {
+		self.tagLockProvider = [[NBETagLockProvider alloc] initWithDriver:driverWrapper];
+	}
+	return orig;
+}
+
+- (void)didScreenStateChange:(bool)state {
+	[self.tagLockProvider screenStateChanged:state];
 	%orig;
+}
+
+- (void)handleDetectedTags:(NSMutableArray <NSObject<NFTag> *> *)tags {
+	HBLogInfo(@"Detected tags, count: %lu", [tags count]);
 
 	/**
 	*	_readermodeBurnoutProtectionTimer
@@ -49,16 +60,60 @@ float debounceTime = 1;
 	*	Modified here because it also affects app sessions.
 	*/
 	NFDriverWrapper *driverWrapper = MSHookIvar<NFDriverWrapper *>(self, "_driverWrapper");
-	NFTimer *protectionTimer = MSHookIvar<NFTimer *>(driverWrapper, "_readermodeBurnoutProtectionTimer");
-	[protectionTimer stopTimer];
 
-	HBLogInfo(@"Restarting Timer to: %f: ", protectionTime);
-	[protectionTimer startTimer:protectionTime leeway:0.1];
+	HBLogInfo(@"Restarting Timer to: %f", protectionTime);
+	NFTimer *protectionTimer = MSHookIvar<NFTimer *>(driverWrapper, "_readermodeBurnoutProtectionTimer");
+
+	if (!tagLockEnable) {
+		[protectionTimer stopTimer];
+		[protectionTimer startTimer:protectionTime leeway:0.1];
+	}
+
+	// Dispatch a block that stops the session as soon the tag is no longer present
+	dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+		if ([driverWrapper connectTag:tags[0]]) {
+			while ([driverWrapper checkTagPresence:tags[0]]) {
+				[NSThread sleepForTimeInterval:0.1];
+			}
+			[driverWrapper disconnectTag:tags[0] tagRemovalDetect:YES];
+		}
+
+		// A lock is used whenever the _burnoutProtectionState is accessed
+		NSLock *lock = MSHookIvar<NSLock *>(driverWrapper, "_burnoutStateLock");
+		[lock lock];
+
+		// If the state is 1, the protection timer has not finished yet
+		if (MSHookIvar<unsigned int>(driverWrapper, "_burnoutProtectionState") == 1) {
+			HBLogInfo(@"End Session now");
+			[protectionTimer stopTimer];
+			[protectionTimer startTimer:0 leeway:0];
+		}
+		[lock unlock];
+	});
+
+	if (tagLockEnable) {
+		self.tagLockProvider.debounceTime = debounceTime;
+		if (![self.tagLockProvider shouldSkipTag:tags[0]]) {
+			%orig;
+		}
+	}
+	else {
+		%orig;
+	}
+	
+}
+
+- (bool)updateAirplaneMode {
+	bool orig = %orig;
+
+	if (airplaneOverride) {
+		MSHookIvar<bool>(self, "_airplaneMode") = NO;
+	}
+	return orig;
 }
 %end
 
 static void reloadPreferences() {
-	HBLogInfo(@"Reload preferences");
 	NSString *preferencesFilePath = [NSString stringWithFormat:@"/User/Library/Preferences/com.haotestlabs.nfcbackgroundenablerpreferences.plist"];
 	
 	NSData *fileData = [NSData dataWithContentsOfFile:preferencesFilePath];
@@ -76,12 +131,18 @@ static void reloadPreferences() {
 			if (preferences[@"DebounceTime"]) {
 				debounceTime = [preferences[@"DebounceTime"] floatValue];
 			}
+			if (preferences[@"AirplaneOverride"]) {
+				airplaneOverride = [preferences[@"AirplaneOverride"] boolValue];
+			}
+			if (preferences[@"TagLockEnable"]) {
+				tagLockEnable = [preferences[@"TagLockEnable"] boolValue];
+			}
 		}
 	}
 }
 
 %ctor {
-	HBLogInfo(@"Hooked");
+	HBLogDebug(@"Hooked");
 
 	reloadPreferences();
 	CFNotificationCenterAddObserver(
