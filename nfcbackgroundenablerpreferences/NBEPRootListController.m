@@ -1,5 +1,5 @@
 #import <Preferences/PSSpecifier.h>
-#include "NBEPRootListController.h"
+#import "NBEPRootListController.h"
 
 @implementation NBEPRootListController
 
@@ -13,6 +13,7 @@
 
 // Section copied and modified from https://iphonedevwiki.net/index.php/PreferenceBundles#Into_sandboxed.2Funsandboxed_processes_in_iOS_8
 - (id)readPreferenceValue:(PSSpecifier *)specifier {
+	// Read and return the value from the file
 	NSString *preferencesFilePath = [NSString stringWithFormat:@"/User/Library/Preferences/%@.plist", specifier.properties[@"defaults"]];
 	id preferenceValue = specifier.properties[@"default"];
 
@@ -29,10 +30,22 @@
 		}
 	}
 	
+	// Disable the ProtectionTime option when TagLockEnable is enabled.
+	if ([specifier.properties[@"key"] isEqual:@"TagLockEnable"]) {
+		self.protectionTimeEnable = ![preferenceValue boolValue];
+		[self updateProtectionTimeEnable];
+	}
+
 	return preferenceValue;
 }
 
 - (void)setPreferenceValue:(id)value specifier:(PSSpecifier*)specifier {
+	// Disable the ProtectionTime option when TagLockEnable is enabled.
+	if ([specifier.properties[@"key"] isEqual:@"TagLockEnable"]) {
+		self.protectionTimeEnable = ![value boolValue];
+		[self updateProtectionTimeEnable];
+	}
+
 	NSString *preferencesFilePath = [NSString stringWithFormat:@"/User/Library/Preferences/%@.plist", specifier.properties[@"defaults"]];
 
 	// Read the old preference file.
@@ -48,7 +61,7 @@
 		}
 	}
 
-	// Copy the old preferences with the now value.
+	// Copy the old preferences with the current value.
 	NSMutableDictionary *updatedPreferences = [NSMutableDictionary dictionary];
 	[updatedPreferences addEntriesFromDictionary:preferences];
 	[updatedPreferences setObject:value forKey:specifier.properties[@"key"]];
@@ -64,5 +77,17 @@
 	if (notificationName) {
 		CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(), notificationName, NULL, NULL, YES);
 	}
+}
+
+- (void)updateProtectionTimeEnable {
+	PSSpecifier *protectionSlider = [self specifiers][2];
+
+	[[protectionSlider propertyForKey:@"cellObject"] setCellEnabled:self.protectionTimeEnable];
+	[[protectionSlider propertyForKey:@"control"] setEnabled:self.protectionTimeEnable];
+}
+
+- (void)viewDidAppear:(BOOL)animated; {
+	[self updateProtectionTimeEnable];
+	[super viewDidAppear:animated];
 }
 @end
