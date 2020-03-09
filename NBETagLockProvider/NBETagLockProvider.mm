@@ -56,6 +56,11 @@
 				[self.driverWrapper disconnectTag:self.latestTag tagRemovalDetect:true];
 			}
 
+			// Notify the delegate of the tag removal
+			if (self.tagRemovalDelegate) {
+				[self.tagRemovalDelegate tagPresenceRemoved];
+			}
+
 			// Start a timer to account for the "debounceTime" between sessions.
 			dispatch_async(dispatch_get_main_queue(), ^{
 				_stateOneDebounceTimer = [NSTimer scheduledTimerWithTimeInterval:self.debounceTime repeats:false block:^void (NSTimer *timer) {

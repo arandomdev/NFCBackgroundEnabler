@@ -3,6 +3,7 @@
 #import "Headers/NFTimer.h"
 #import "Headers/NFTag.h"
 #import "NBETagLockProvider/NBETagLockProvider.h"
+#import "NBETagLockProvider/NBETagRemovalProtocol.h"
 
 float protectionTime = 2;
 float debounceTime = 1;
@@ -42,6 +43,7 @@ bool tagLockEnable = YES;
 	id orig = %orig;
 	if (orig) {
 		self.tagLockProvider = [[NBETagLockProvider alloc] initWithDriver:driverWrapper];
+		self.tagLockProvider.tagRemovalDelegate = self;
 	}
 	return orig;
 }
@@ -60,36 +62,13 @@ bool tagLockEnable = YES;
 	*	Modified here because it also affects app sessions.
 	*/
 	NFDriverWrapper *driverWrapper = MSHookIvar<NFDriverWrapper *>(self, "_driverWrapper");
-
-	HBLogInfo(@"Restarting Timer to: %f", protectionTime);
 	NFTimer *protectionTimer = MSHookIvar<NFTimer *>(driverWrapper, "_readermodeBurnoutProtectionTimer");
 
 	if (!tagLockEnable) {
+		HBLogInfo(@"Restarting Timer to: %f", protectionTime);
 		[protectionTimer stopTimer];
 		[protectionTimer startTimer:protectionTime leeway:0.1];
 	}
-
-	// Dispatch a block that stops the session as soon the tag is no longer present
-	dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-		if ([driverWrapper connectTag:tags[0]]) {
-			while ([driverWrapper checkTagPresence:tags[0]]) {
-				[NSThread sleepForTimeInterval:0.1];
-			}
-			[driverWrapper disconnectTag:tags[0] tagRemovalDetect:YES];
-		}
-
-		// A lock is used whenever the _burnoutProtectionState is accessed
-		NSLock *lock = MSHookIvar<NSLock *>(driverWrapper, "_burnoutStateLock");
-		[lock lock];
-
-		// If the state is 1, the protection timer has not finished yet
-		if (MSHookIvar<unsigned int>(driverWrapper, "_burnoutProtectionState") == 1) {
-			HBLogInfo(@"End Session now");
-			[protectionTimer stopTimer];
-			[protectionTimer startTimer:0 leeway:0];
-		}
-		[lock unlock];
-	});
 
 	if (tagLockEnable) {
 		self.tagLockProvider.debounceTime = debounceTime;
@@ -110,6 +89,24 @@ bool tagLockEnable = YES;
 		MSHookIvar<bool>(self, "_airplaneMode") = NO;
 	}
 	return orig;
+}
+
+%new
+- (void)tagPresenceRemoved {
+	NFDriverWrapper *driverWrapper = MSHookIvar<NFDriverWrapper *>(self, "_driverWrapper");
+
+	// A lock is used whenever the _burnoutProtectionState is accessed
+	NSLock *lock = MSHookIvar<NSLock *>(driverWrapper, "_burnoutStateLock");
+	[lock lock];
+
+	// If the state is 1, the protection timer has not finished yet
+	if (MSHookIvar<unsigned int>(driverWrapper, "_burnoutProtectionState") == 1) {
+		HBLogInfo(@"End Session now");
+		NFTimer *protectionTimer = MSHookIvar<NFTimer *>(driverWrapper, "_readermodeBurnoutProtectionTimer");
+		[protectionTimer stopTimer];
+		[protectionTimer startTimer:0 leeway:0];
+	}
+	[lock unlock];
 }
 %end
 
