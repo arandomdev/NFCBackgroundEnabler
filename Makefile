@@ -1,7 +1,7 @@
-export FINALPACKAGE = 1
+# export FINALPACKAGE = 1
 
-export TARGET = iphone:clang:11.2:latest
-export ARCHS = arm64 arm64e
+# export TARGET = iphone:clang:11.2:latest
+export ARCHS = arm64 #arm64e
 
 INSTALL_TARGET_PROCESSES = nfcd
 

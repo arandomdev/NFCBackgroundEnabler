@@ -11,7 +11,54 @@ bool airplaneOverride = false;
 bool tagLockEnable = YES;
 
 %hook NFHardwareControllerInfo
-- (bool)hasLPCDSupport {
+// Iphone SE testing
+- (bool)hasLPEMSupport {
+	return YES;
+}
+- (bool)hasHLMSupport {
+	return YES;
+}
+- (bool)hasExpressGenericAMode {
+	return YES;
+}
+- (bool)hasExpressECPAccessMode {
+	return YES;
+}
+- (bool)hasExpressFelicaTransitMode {
+	return YES;
+}
+- (bool)hasMFW {
+	return YES;
+}
+- (bool)hasIcfResistor {
+	return YES;
+}
+- (bool)hasBooster {
+	return YES;
+}
+- (bool)hasAntenna {
+	return YES;
+}
+- (unsigned long long)middlewareVersion {
+	return %orig;
+}
+- (unsigned long long)firmwareRevision {
+	return %orig;
+}
+- (unsigned long long)firmwareVersion {
+	return %orig;
+}
+- (unsigned long long)ROMVersion {
+	return %orig;
+}
+- (unsigned long long)siliconName {
+	return %orig;
+}
+- (unsigned long long)siliconVersion {
+	return %orig;
+}
+
+- (unsigned long long)hasLPCDSupport {
 	// Enables background tag detection.
 	return YES;
 }
