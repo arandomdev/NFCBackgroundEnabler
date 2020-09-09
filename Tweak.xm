@@ -2,8 +2,14 @@
 #import "Headers/NFDriverWrapper.h"
 #import "Headers/NFTimer.h"
 #import "Headers/NFTag.h"
+#import "Headers/NFTagInternal.h"
+#import "Headers/NFCNDEFMessage.h"
+#import "Headers/NFCNDEFPayload.h"
 #import "NBETagLockProvider/NBETagLockProvider.h"
 #import "NBETagLockProvider/NBETagRemovalProtocol.h"
+#import "NSData+Conversion.h"
+
+extern "C" CFNotificationCenterRef CFNotificationCenterGetDistributedCenter(void);
 
 float protectionTime = 2;
 float debounceTime = 1;
@@ -72,14 +78,35 @@ bool tagLockEnable = YES;
 
 	if (tagLockEnable) {
 		self.tagLockProvider.debounceTime = debounceTime;
-		if (![self.tagLockProvider shouldSkipTag:tags[0]]) {
-			%orig;
-		}
+        if ([self.tagLockProvider shouldSkipTag:tags[0]]) return;
 	}
-	else {
-		%orig;
-	}
-	
+    
+    %orig;
+    
+    if ([[NSFileManager defaultManager] fileExistsAtPath:@"/Library/MobileSubstrate/DynamicLibraries/NFCActivator.dylib"]){
+        NSMutableArray *compiledData = [[NSMutableArray alloc] init];
+        for (NFTagInternal *tag in tags) {
+            NSString *uid = [tag.tagID hexadecimalString];
+            
+            NSMutableArray *records = [[NSMutableArray alloc] init];
+            [self _readNDEFFromTag:tag];
+            id messageInternal = [self _readNDEFFromTag:tag];
+            NFCNDEFMessage *ndefMessage = [[NFCNDEFMessage alloc] initWithNFNdefMessage: messageInternal];
+            for(NFCNDEFPayload *payload in ndefMessage.records) {
+                NSString *payloadData = [[NSString alloc] initWithData:payload.payload encoding:NSUTF8StringEncoding];
+                NSString *type = [[NSString alloc] initWithData:payload.type encoding:NSUTF8StringEncoding];
+                [records addObject:@{@"payload" : payloadData, @"type" : type}];
+            }
+            
+            [compiledData addObject:@{@"uid" : uid, @"records" : [records copy]}];
+        }
+        
+        dispatch_async(dispatch_get_main_queue(), ^{
+            CFDictionaryRef userInfo = (__bridge CFDictionaryRef)@{@"data" : [compiledData copy]};
+            CFNotificationCenterRef center = CFNotificationCenterGetDistributedCenter();
+            CFNotificationCenterPostNotification(center, CFSTR("nfcbackground.newtag"), NULL, userInfo, TRUE);
+        });
+    }
 }
 
 - (bool)updateAirplaneMode {

@@ -1,3 +1,4 @@
+export DEBUG = 0
 export FINALPACKAGE = 1
 
 export TARGET = iphone:clang:11.2:latest
@@ -9,8 +10,9 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = NFCBackgroundEnabler
 
-NFCBackgroundEnabler_FILES = Tweak.xm NBETagLockProvider/NBETagLockProvider.mm
+NFCBackgroundEnabler_FILES = Tweak.xm NBETagLockProvider/NBETagLockProvider.mm NSData+Conversion.m
 NFCBackgroundEnabler_CFLAGS = -fobjc-arc
+NFCBackgroundEnabler_FRAMEWORKS = CoreNFC
 
 include $(THEOS_MAKE_PATH)/tweak.mk
 SUBPROJECTS += nfcbackgroundenablerpreferences
